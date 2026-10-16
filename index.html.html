@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>J.A.R.V.I.S. — Assistente de IA</title>
+<style>
+  :root{
+    --c:#00e5ff; --c2:#0a84ff; --bg:#02070d; --panel-bg: rgba(0,229,255,.04);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    font-family:"Courier New",monospace;
+    background:radial-gradient(circle at 50% 40%, #07202e 0%, var(--bg) 70%);
+    color:var(--c);
+    overflow:hidden;
+    user-select:none;
+  }
+  body::before{
+    content:"";
+    position:fixed; inset:0; pointer-events:none;
+    background:repeating-linear-gradient(0deg, rgba(0,229,255,.03) 0 1px, transparent 1px 3px);
+  }
+  header{display:flex;justify-content:space-between;padding:16px 24px;border-bottom:1px solid rgba(0,229,255,.3);
+    letter-spacing:3px;font-size:13px}
+  main{flex:1;display:grid;grid-template-columns:280px 1fr 380px;gap:16px;padding:16px 24px;min-height:0}
+  .panel{border:1px solid rgba(0,229,255,.35);background:var(--panel-bg);padding:14px;border-radius:6px;
+    box-shadow:0 0 18px rgba(0,229,255,.06) inset; overflow-y:auto;}
+  .panel h3{font-size:11px;letter-spacing:3px;margin-bottom:12px;opacity:.85}
+  .meter{margin-bottom:12px;font-size:11px}
+  .bar{height:8px;background:rgba(0,229,255,.12);margin-top:6px;border-radius:6px;overflow:hidden}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--c2),var(--c));transition:width .9s}
+  #clock{font-size:34px;text-align:center;text-shadow:0 0 12px var(--c)}
+  #date{text-align:center;font-size:11px;opacity:.7;margin-top:6px}
+  
+  .center{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+    width:100%;
+    height:100%;
+    cursor:pointer;
+  }
+  #hud {
+    width: 520px;
+    height: 520px;
+    max-width: 90vw;
+    max-height: 90vh;
+  }
+
+  #status{position:absolute;bottom:12px;font-size:12px;letter-spacing:4px;text-shadow:0 0 8px var(--c)}
+  .chat{display:flex;flex-direction:column;min-height:0}
+  #log{flex:1;overflow-y:auto;font-size:13px;line-height:1.6;margin-bottom:10px;padding-right:6px}
+  #log p{margin-bottom:10px; white-space: pre-wrap;}
+  #log .me{color:#9fd8ff;opacity:.9}
+  #log .ai::before{content:"JARVIS ▸ ";color:var(--c2);font-weight:700}
+  #log .me::before{content:"VOCÊ ▸ "}
+  
+  /* Cartões no Chat */
+  .news-card {
+    background: rgba(0, 229, 255, 0.05);
+    border: 1px solid rgba(0, 229, 255, 0.3);
+    border-radius: 6px;
+    margin: 8px 0;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    opacity: 0;
+    transform: translateY(10px);
+    animation: fadeInCard 0.5s forwards;
+  }
+  @keyframes fadeInCard {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .news-card img {
+    width: 100%;
+    max-height: 180px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 229, 255, 0.2);
+  }
+  .news-card a {
+    color: var(--c);
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 13px;
+  }
+  .news-card .description {
+    font-size: 11px;
+    color: #c0f2ff;
+    line-height: 1.4;
+    opacity: 0.9;
+  }
+
+  /* OVERLAY HOLOGRÁFICO NO CENTRO */
+  #centerOverlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.3);
+    width: 480px;
+    max-height: 460px;
+    background: rgba(2, 15, 26, 0.96);
+    border: 2px solid var(--c);
+    box-shadow: 0 0 40px rgba(0, 229, 255, 0.8);
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: auto;
+    overflow: hidden;
+    transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  #centerOverlay.active {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  #centerOverlay.fly-to-chat {
+    opacity: 0;
+    transform: translate(280px, -50%) scale(0.1);
+  }
+  #centerOverlay img {
+    width: 100%;
+    height: 190px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--c);
+  }
+  #centerOverlay .title {
+    font-size: 14px;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 0 6px var(--c);
+  }
+  #centerOverlay .full-text {
+    font-size: 12px;
+    color: #a2e8ff;
+    overflow-y: auto;
+    max-height: 130px;
+    line-height: 1.4;
+    padding-right: 4px;
+  }
+  #centerOverlay .click-hint {
+    font-size: 10px;
+    color: var(--c2);
+    text-align: center;
+    letter-spacing: 1px;
+    margin-top: 4px;
+    opacity: 0.8;
+  }
+
+  form{display:flex;gap:8px}
+  input[type="text"], input[type="password"]{flex:1;background:transparent;border:1px solid rgba(0,229,255,.45);color:var(--c);padding:9px;border-radius:4px;font:inherit;outline:none}
+  input[type="text"]:focus, input[type="password"]:focus{box-shadow:0 0 10px rgba(0,229,255,.35)}
+  button{background:rgba(0,229,255,.12);border:1px solid var(--c);color:var(--c);padding:9px 12px;cursor:pointer;border-radius:4px}
+  button:hover{background:rgba(0,229,255,.28)}
+  button.active-mic { background: rgba(0, 229, 255, 0.4); border-color: #fff; box-shadow: 0 0 10px var(--c); }
+  .small{font-size:11px;padding:6px 8px}
+  .settings{margin-top:10px;font-size:12px;display:flex;flex-direction:column;gap:8px}
+  .settings label{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  select,input[type="number"]{background:transparent;border:1px solid rgba(0,229,255,.45);color:var(--c);padding:6px;border-radius:4px}
+  .muted{opacity:.7;font-size:11px}
+  .source-list{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{background:rgba(255,255,255,.02);border:1px solid rgba(0,229,255,.08);padding:4px 6px;border-radius:4px;cursor:pointer;font-size:11px}
+  .chip.active{background:linear-gradient(90deg,var(--c2),var(--c));color:#001; font-weight:700}
+  @media (max-width:980px){ main{grid-template-columns:1fr;overflow-y:auto;padding:12px} body{overflow:auto} .center{height:360px} }
+</style>
+</head>
+<body>
+<header>
+  <span>J.A.R.V.I.S. // SISTEMA ONLINE</span>
+  <span id="net">REDE: ESTÁVEL</span>
+</header>
+
+<main>
+  <!-- Painel Esquerdo -->
+  <section class="panel">
+    <h3>MÉTRICAS DO SISTEMA</h3>
+    <div id="clock">--:--:--</div>
+    <div id="date"></div>
+    <br/>
+    <div class="meter">CPU <span id="cpuv"></span>
+      <div class="bar"><i id="cpu"></i></div>
+    </div>
+    <div class="meter">MEMÓRIA <span id="memv"></span>
+      <div class="bar"><i id="mem"></i></div>
+    </div>
+    <div class="meter">ENERGIA <span id="pwrv"></span>
+      <div class="bar"><i id="pwr"></i></div>
+    </div>
+    <div class="meter">SINAL <span id="sigv"></span>
+      <div class="bar"><i id="sig"></i></div>
+    </div>
+
+    <div class="settings">
+      <strong style="letter-spacing:2px;opacity:.9;margin-top:8px;">CONFIGURAÇÃO DE IA</strong>
+      <label style="flex-direction:column;align-items:flex-start;gap:4px;">
+        <span class="muted">Chave API Gemini:</span>
+        <input id="apiKeyInput" type="password" placeholder="Cole sua chave API aqui..." style="width:100%" />
+      </label>
+
+      <strong style="letter-spacing:2px;opacity:.9;margin-top:10px;">ATALHOS RÁPIDOS</strong>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+        <button id="testNews" class="small">Abrir Jornal</button>
+        <button id="getWeather" class="small">Tempo em SP</button>
+        <button id="btnInsta" class="small">Plano Instagram</button>
+      </div>
+
+      <div style="margin-top:8px;">
+        <div class="muted" style="margin-bottom:4px;">Seção de Notícias:</div>
+        <div class="source-list" id="sources"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Painel Central -->
+  <section class="center" id="centerPanel">
+    <canvas id="hud" width="520" height="520"></canvas>
+    <div id="centerOverlay">
+      <img id="overlayImg" src="" alt="" />
+      <div class="title" id="overlayTitle"></div>
+      <div class="full-text" id="overlayText"></div>
+      <div class="click-hint">[ CLIQUE OU FALE "PRÓXIMA" / "CANCELAR" ]</div>
+    </div>
+    <div id="status">AGUARDANDO</div>
+  </section>
+
+  <!-- Painel Direito -->
+  <section class="panel chat">
+    <h3>INTERFACE DE COMUNICAÇÃO</h3>
+    <div id="log" role="log" aria-live="polite">
+      <p class="ai">Sistemas inicializados, Senhor. Como posso ajudar hoje?</p>
+    </div>
+
+    <form id="f">
+      <input id="q" type="text" autocomplete="off" placeholder="Digite ou ative o microfone para falar..." />
+      <button type="button" id="mic" title="Ativar/Desativar Escuta">🎙️ OFF</button>
+      <button id="sendBtn">▶</button>
+    </form>
+  </section>
+</main>
+
+<script>
+/* ---------- DESENHO DO HUD ANIMADO ---------- */
+const cv = document.getElementById('hud');
+const ctx = cv.getContext('2d');
+let t = 0, speaking = false;
+
+function ring(r,w,dash,rot,alpha,color='0,229,255'){ 
+  ctx.save(); ctx.translate(260,260); ctx.rotate(rot);
+  ctx.strokeStyle = `rgba(${color},${alpha})`; ctx.lineWidth = w; ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.stroke(); ctx.restore(); 
+}
+
+function draw(){
+  t += 0.01; 
+  ctx.clearRect(0,0,520,520);
+  const pulse = speaking ? 8*Math.sin(t*25) : 3*Math.sin(t*3);
+  
+  const g = ctx.createRadialGradient(260,260,5,260,260,110+pulse);
+  g.addColorStop(0,'rgba(0,229,255,.6)'); 
+  g.addColorStop(1,'rgba(0,229,255,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(260,260,110+pulse,0,Math.PI*2); ctx.fill();
+  
+  ring(60+pulse/2,2,[],0,.9);
+  ring(95,6,[40,14],t,.8);
+  ring(125,2,[4,8],-t*1.4,.7,'10,132,255');
+  ring(160,10,[90,30],t*.6,.5);
+  ring(195,1.5,[2,6],-t*.8,.8);
+  ring(230,3,[140,40,20,40],t*.3,.6,'10,132,255');
+  
+  ctx.save(); ctx.translate(260,260); ctx.rotate(t*.2);
+  for(let i=0;i<72;i++){ 
+    ctx.rotate(Math.PI/36); ctx.strokeStyle='rgba(0,229,255,.5)';
+    ctx.beginPath(); ctx.moveTo(244,0); ctx.lineTo(i%6==0?256:250,0); ctx.stroke(); 
+  }
+  ctx.restore();
+  
+  ctx.strokeStyle='rgba(0,229,255,.9)'; ctx.lineWidth=2; ctx.beginPath();
+  for(let x=-50;x<=50;x++){ 
+    const a = speaking ? 18 : 4; 
+    const y = Math.sin(x*.25+t*12)*a*Math.cos(x*.03);
+    x===-50?ctx.moveTo(260+x,260+y):ctx.lineTo(260+x,260+y); 
+  }
+  ctx.stroke();
+  requestAnimationFrame(draw);
+}
+draw();
+
+/* ---------- RELÓGIO E MÉTRICAS ---------- */
+function tick(){
+  const d=new Date();
+  document.getElementById('clock').textContent = d.toLocaleTimeString('pt-BR');
+  document.getElementById('date').textContent = d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).toUpperCase();
+}
+setInterval(tick,1000); tick();
+
+function meters(){
+  for(const id of ['cpu','mem','pwr','sig']){
+    const v = Math.round(id==='pwr'?88+Math.random()*10:20+Math.random()*50);
+    document.getElementById(id).style.width = v+'%';
+    document.getElementById(id+'v').textContent = v+'%';
+  }
+}
+setInterval(meters,2000); meters();
+
+/* ---------- CHAT E VOZ ---------- */
+const log = document.getElementById('log'), q = document.getElementById('q'), st = document.getElementById('status');
+
+function add(text, cls){
+  const p = document.createElement('p'); if(cls) p.className = cls; p.textContent = text; log.appendChild(p); log.scrollTop = log.scrollHeight;
+}
+
+function addNewsCard(title, link, imageUrl, description) {
+  const card = document.createElement('div');
+  card.className = 'news-card';
+  if(imageUrl) {
+    const img = document.createElement('img');
+    img.src = imageUrl;
+    img.onerror = () => img.style.display = 'none';
+    card.appendChild(img);
+  }
+  const a = document.createElement('a');
+  a.href = link;
+  a.target = '_blank';
+  a.textContent = title;
+  card.appendChild(a);
+
+  if (description) {
+    const desc = document.createElement('div');
+    desc.className = 'description';
+    desc.textContent = description;
+    card.appendChild(desc);
+  }
+
+  log.appendChild(card);
+  log.scrollTop = log.scrollHeight;
+}
+
+function speak(text, onCompleteCallback){
+  add(text,'ai'); st.textContent='FALANDO'; speaking=true;
+  if('speechSynthesis' in window){
+    const u = new SpeechSynthesisUtterance(text); u.lang='pt-BR'; u.rate = 1.05;
+    u.onend = ()=>{ 
+      speaking=false; 
+      st.textContent= micActive ? 'OUVINDO...' : 'AGUARDANDO'; 
+      if(onCompleteCallback) onCompleteCallback();
+    };
+    u.onerror = ()=>{ 
+      speaking=false; 
+      st.textContent= micActive ? 'OUVINDO...' : 'AGUARDANDO'; 
+    };
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  } else {
+    setTimeout(()=>{ 
+      speaking=false; 
+      st.textContent= micActive ? 'OUVINDO...' : 'AGUARDANDO'; 
+      if(onCompleteCallback) onCompleteCallback();
+    }, 1200);
+  }
+}
+
+function replyBasic(m){
+  m = (m||'').toLowerCase();
+  if(/que horas são|hora atual|horas/.test(m)) return 'Agora são '+new Date().toLocaleTimeString('pt-BR')+'.';
+  if(/que dia é hoje|data de hoje/.test(m)) return 'Hoje é '+new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'.';
+  if(/status do sistema|status/.test(m)) return 'Todos os sistemas estão totalmente operacionais, Senhor.';
+  return null;
+}
+
+/* ---------- CONTROLADORES DE INTERAÇÃO COM O JORNAL (VOZ & CLIQUE) ---------- */
+let newsActionResolver = null;
+
+function handleVoiceNewsCommand(cmd) {
+  const lower = cmd.toLowerCase();
+  if (isProcessingNews && newsActionResolver) {
+    if (/\bpróxima\b|\bproxima\b|\bavançar\b|\bavancar\b|\bpróximo\b|\bproximo\b/.test(lower)) {
+      newsActionResolver('next');
+      newsActionResolver = null;
+      return true;
+    }
+    if (/\bcancelar\b|\bparar\b|\bfechar\b|\bsair\b/.test(lower)) {
+      newsActionResolver('cancel');
+      newsActionResolver = null;
+      return true;
+    }
+  }
+  return false;
+}
+
+/* ---------- MICROFONE COM ALTERNÂNCIA ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+let recognition = null;
+let micActive = false;
+const micBtn = document.getElementById('mic');
+
+function toggleMic() {
+  if (!SR) {
+    speak("Reconhecimento de voz não suportado neste navegador.");
+    return;
+  }
+
+  if (!micActive) {
+    recognition = new SR();
+    recognition.lang = 'pt-BR';
+    recognition.continuous = true;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      micActive = true;
+      micBtn.textContent = '🎙️ ON';
+      micBtn.classList.add('active-mic');
+      st.textContent = 'OUVINDO...';
+    };
+
+    recognition.onresult = (ev) => {
+      const transcript = ev.results[ev.results.length - 1][0].transcript.trim();
+      if (transcript && !speaking) {
+        // Verifica primeiro se é um comando para avançar/cancelar notícias
+        if (handleVoiceNewsCommand(transcript)) {
+          add(transcript, 'me');
+          return;
+        }
+        add(transcript, 'me');
+        handleInputRaw(transcript, true);
+      }
+    };
+
+    recognition.onerror = () => { stopMic(); };
+
+    recognition.onend = () => {
+      if (micActive && !speaking) {
+        try { recognition.start(); } catch(e){}
+      }
+    };
+
+    try { recognition.start(); } catch(e){}
+  } else {
+    stopMic();
+  }
+}
+
+function stopMic() {
+  micActive = false;
+  micBtn.textContent = '🎙️ OFF';
+  micBtn.classList.remove('active-mic');
+  st.textContent = 'AGUARDANDO';
+  if (recognition) {
+    try { recognition.stop(); } catch(e){}
+  }
+}
+
+micBtn.onclick = toggleMic;
+
+/* ---------- PREVISÃO DO TEMPO SÃO PAULO ---------- */
+async function fetchSaoPauloWeather() {
+  st.textContent = 'BUSCANDO';
+  speak("Verificando relatório meteorológico de São Paulo, Senhor...");
+  try {
+    const url = "https://api.open-meteo.com/v1/forecast?latitude=-23.5475&longitude=-46.6361&current_weather=true";
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Erro na API do tempo");
+    const data = await res.json();
+    const temp = Math.round(data.current_weather.temperature);
+    const wind = Math.round(data.current_weather.windspeed);
+    
+    const weatherMsg = `Em São Paulo, a temperatura atual é de ${temp} graus Celsius, com ventos a ${wind} km/h.`;
+    speak(weatherMsg);
+  } catch (error) {
+    console.error(error);
+    speak("Não foi possível acessar os dados meteorológicos no momento.");
+  }
+}
+
+/* ---------- INTEGRAÇÃO GEMINI ---------- */
+const apiKeyInput = document.getElementById('apiKeyInput');
+apiKeyInput.value = localStorage.getItem('apex_gemini_key') || '';
+apiKeyInput.addEventListener('change', () => {
+  localStorage.setItem('apex_gemini_key', apiKeyInput.value.trim());
+});
+
+async function askGemini(promptText) {
+  const apiKey = localStorage.getItem('apex_gemini_key') || apiKeyInput.value.trim();
+  if (!apiKey) {
+    return "Senhor, insira a chave da API do Gemini no painel à esquerda.";
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+  const payload = {
+    contents: [{ parts: [{ text: promptText }] }],
+    systemInstruction: {
+      parts: [{ text: "Você é o J.A.R.V.I.S., assistente de inteligência artificial futurista. Trate o usuário por 'Senhor'. Caso ele peça estratégias, cronogramas ou planos (ex: Instagram, negócios, etc), seja detalhado, organizado e direto com um plano de ação completo." }]
+    }
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) throw new Error(`Erro API: ${response.status}`);
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Sem resposta da IA.";
+  } catch (error) {
+    console.error(error);
+    return "Erro ao comunicar com o servidor do Gemini. Verifique a chave API.";
+  }
+}
+
+async function handleInputRaw(v, viaVoice=false){
+  const lower = (v||'').toLowerCase();
+  if(/\bbom dia\b/.test(lower) || /\bnotícias\b/.test(lower) || /\bnoticias\b/.test(lower) || /\bjornal\b/.test(lower)){
+    handleMorningTrigger();
+    return;
+  }
+  if(/\bclima\b/.test(lower) || /\btempo\b/.test(lower) || /\bprevisão\b/.test(lower) || /\bprevisao\b/.test(lower)){
+    fetchSaoPauloWeather();
+    return;
+  }
+  const basic = replyBasic(v);
+  if(basic){
+    speak(basic);
+    return;
+  }
+
+  st.textContent = 'PENSANDO';
+  const aiReply = await askGemini(v);
+  speak(aiReply);
+}
+
+/* ---------- NOTÍCIAS COM COMANDO POR VOZ & CLIQUE ---------- */
+const NEWS_SOURCES = [
+  { id:'g1', label:'G1 Brasil', url:'https://g1.globo.com/rss/g1/' },
+  { id:'bbc', label:'BBC Mundo/Brasil', url:'https://feeds.bbci.co.uk/portuguese/rss.xml' },
+  { id:'folha', label:'Folha de S.Paulo', url:'https://feeds.folha.uol.com.br/emcimadahora/rss.xml' },
+  { id:'ge', label:'Globo Esporte', url:'https://ge.globo.com/rss/ge/' }
+];
+const sourcesEl = document.getElementById('sources');
+let selectedSource = localStorage.getItem('apex_source') || 'g1';
+
+function renderSourceChips(){
+  sourcesEl.innerHTML = '';
+  NEWS_SOURCES.forEach(s=>{
+    const el = document.createElement('div'); 
+    el.className = 'chip' + (s.id===selectedSource?' active':'');
+    el.textContent = s.label;
+    el.onclick = () => { selectedSource = s.id; localStorage.setItem('apex_source', selectedSource); renderSourceChips(); };
+    sourcesEl.appendChild(el);
+  });
+}
+renderSourceChips();
+
+function cleanHTMLText(html) {
+  const temp = document.createElement("div");
+  temp.innerHTML = html;
+  return temp.textContent || temp.innerText || "";
+}
+
+async function fetchHeadlinesWithImages(limit=5){
+  const s = NEWS_SOURCES.find(x=>x.id===selectedSource) || NEWS_SOURCES[0];
+  const jsonUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(s.url)}`;
+  
+  const res = await fetch(jsonUrl);
+  if (!res.ok) throw new Error("Erro na requisição das notícias");
+  
+  const data = await res.json();
+  if (!data.items || data.items.length === 0) return [];
+
+  return data.items.slice(0, limit).map(item => {
+    let imageUrl = item.thumbnail || item.enclosure?.link || '';
+    if (!imageUrl && item.description) {
+      const match = item.description.match(/src=["']([^"']+)["']/i);
+      if (match) imageUrl = match[1];
+    }
+    
+    let fullContent = cleanHTMLText(item.content || item.description || "");
+
+    return {
+      title: item.title,
+      link: item.link,
+      imageUrl: imageUrl,
+      fullText: fullContent
+    };
+  });
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+let isProcessingNews = false;
+
+function waitForNewsUserAction() {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('centerOverlay');
+    
+    // Armazena o resolvedor para ser usado também via comando de voz
+    newsActionResolver = resolve;
+
+    const onClick = () => {
+      overlay.removeEventListener('click', onClick);
+      if (newsActionResolver) {
+        newsActionResolver('next');
+        newsActionResolver = null;
+      }
+    };
+    
+    overlay.addEventListener('click', onClick);
+  });
+}
+
+async function handleMorningTrigger(){
+  if(isProcessingNews) return;
+  isProcessingNews = true;
+
+  st.textContent = 'BUSCANDO';
+  
+  const overlay = document.getElementById('centerOverlay');
+  const overlayImg = document.getElementById('overlayImg');
+  const overlayTitle = document.getElementById('overlayTitle');
+  const overlayText = document.getElementById('overlayText');
+
+  try {
+    const news = await fetchHeadlinesWithImages();
+    if (news.length === 0) {
+      speak('Não foram encontradas notícias no momento.');
+      return;
+    }
+
+    speak('Projetando o jornal. Fale "próxima" para avançar ou "cancelar" para interromper.');
+    await delay(3500);
+
+    for (let item of news) {
+      overlay.className = '';
+      
+      if (item.imageUrl) {
+        overlayImg.src = item.imageUrl;
+        overlayImg.style.display = 'block';
+      } else {
+        overlayImg.style.display = 'none';
+      }
+      overlayTitle.textContent = item.title;
+      overlayText.textContent = item.fullText;
+
+      await delay(50);
+      overlay.className = 'active';
+
+      // Aguarda ação por Voz ("próxima" / "cancelar") ou Clique
+      const action = await waitForNewsUserAction();
+
+      if (action === 'cancel') {
+        speak("Apresentação do jornal cancelada, Senhor.");
+        break;
+      }
+
+      overlay.className = 'fly-to-chat';
+      await delay(500);
+
+      addNewsCard(item.title, item.link, item.imageUrl, item.fullText);
+      overlay.className = '';
+      await delay(200);
+    }
+
+    if (newsActionResolver === null) {
+      speak("Transmissão do jornal concluída, Senhor.");
+    }
+  } catch(e) {
+    console.error(e);
+    speak('Não foi possível carregar as notícias no momento.');
+  } finally {
+    overlay.className = '';
+    st.textContent = micActive ? 'OUVINDO...' : 'AGUARDANDO';
+    isProcessingNews = false;
+    newsActionResolver = null;
+  }
+}
+
+/* ---------- EVENTOS ---------- */
+document.getElementById('f').addEventListener('submit', e => {
+  e.preventDefault();
+  const v = q.value.trim();
+  if(!v) return;
+  add(v,'me'); q.value='';
+  handleInputRaw(v, false);
+});
+
+document.getElementById('testNews').onclick = () => handleMorningTrigger();
+document.getElementById('getWeather').onclick = () => fetchSaoPauloWeather();
+document.getElementById('btnInsta').onclick = () => {
+  const prompt = "Crie um cronograma semanal detalhado e estratégico de conteúdo para crescer o meu perfil do Instagram (Reels, Stories, Carrosséis e horários).";
+  add(prompt, 'me');
+  handleInputRaw(prompt, false);
+};
+</script>
+</body>
+</html>
